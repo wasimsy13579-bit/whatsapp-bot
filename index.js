@@ -5,9 +5,9 @@ const http = require('http');
 
 let latestQR = ''; 
 
-// سيرفر الويب لعرض كود الـ QR كصورة مريحة للجوال
+// سيرفر الويب الذكي لعرض كود الـ QR كصورة مريحة للجوال
 const port = process.env.PORT || 3000;
-const server = http.createServer((req, res) => {
+http.createServer((req, res) => {
     if (latestQR) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -19,36 +19,32 @@ const server = http.createServer((req, res) => {
                     body { text-align: center; font-family: Arial, sans-serif; margin-top: 30px; background-color: #f4f4f9; color: #333; }
                     .container { max-width: 400px; margin: auto; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
                     img { max-width: 100%; height: auto; border: 4px solid #25D366; border-radius: 5px; margin-top: 15px; }
-                    p { font-size: 14px; color: #666; }
                 </style>
             </head>
             <body>
                 <div class="container">
                     <h2>🤖 مساعدك الذكي جاهز للربط</h2>
-                    <p>إذا واجهت فصل في السيرفر، قم بتحديث الصفحة وامسح الكود الجديد.</p>
+                    <p>امسح الكود عبر كاميرا الواتساب للأجهزة المرتبطة.</p>
                     <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQR)}" alt="WhatsApp QR">
-                    <p style="margin-top:15px; font-weight:bold; color:#25D366;">يتجدد الكود تلقائياً عند الحاجة</p>
+                    <p style="margin-top:15px; font-weight:bold; color:#25D366;">حدث الصفحة إذا انتهت صلاحية الكود</p>
                 </div>
             </body>
             </html>
         `);
     } else {
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('البوت يعمل الآن ومستقر بنجاح!');
+        res.end('البوت متصل ويعمل بنجاح الآن!');
     }
-});
-
-server.listen(port);
+}).listen(port);
 
 // إعداد الذكاء الاصطناعي
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
     systemInstruction: "أنت مساعد ذكي للرد على العملاء عبر الواتساب. أجب دائماً باللغة العربية بأسلوب ودود ومختصر يناسب محادثات الشات. إذا استمعت لمقطع صوتی، افهمه جيداً وأجب عليه كتابةً."
 });
 
-// إعداد عميل الواتساب مع إعدادات صارمة لتقليل استهلاك الرام (تناسب الـ 512 ميجا)
+// إعداد عميل الواتساب مع خفض استهلاك الرام تماماً
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: { 
@@ -56,10 +52,10 @@ const client = new Client({
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage', // يمنع استخدام الذاكرة المشتركة لتوفير الرام
-            '--disable-gpu',           // إيقاف معالج الرسوميات تماماً لتقليل الضغط
-            '--no-zygote',             // تعطيل العمليات الخلفية الزائدة لكروم
-            '--single-process'         // دمج المتصفح في عملية واحدة فقط (أهم سطر لحل مشكلة الـ Memory)
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-zygote',
+            '--single-process'
         ] 
     }
 });
@@ -70,10 +66,11 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', () => {
-    latestQR = ''; // تنظيف المتغير بعد نجاح الاستقرار
+    latestQR = ''; 
     console.log('✅ البوت جاهز الآن ومتصل بالواتساب ومستعد لاستقبال الرسائل والمكالمات!');
 });
 
+// إدارة المكالمات الواردة (الرفض والرد التلقائي)
 client.on('call', async (call) => {
     if (call.isGroup) return;
     try {
@@ -82,6 +79,7 @@ client.on('call', async (call) => {
     } catch (err) { console.error(err); }
 });
 
+// إدارة الرسائل والصوت الوارد
 client.on('message', async (msg) => {
     if (msg.from.endsWith('@g.us') || msg.fromMe) return;
     try {
