@@ -1,13 +1,24 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const http = require('http'); // مكتبة مدمجة لإنشاء سيرفر وهمي لتجاوز الـ Timeout
+
+// إنشاء سيرفر ويب وهمي لإرضاء منصة Render ومنع فصل البوت
+const port = process.env.PORT || 3000;
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('WhatsApp Bot is Online!\n');
+});
+server.listen(port, () => {
+    console.log(`سيرفر الفحص الذكي يعمل بنجاح على منفذ: ${port}`);
+});
 
 // استدعاء المفتاح السري بأمان من إعدادات السيرفر (Environment Variables)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
-    systemInstruction: "أنت مساعد ذكي للرد على العملاء عبر الواتساب. أجب دائماً باللغة العربية بأسلوب ودود ومختصر يناسب محادثات الشات. إذا استمعت لمقطع صوتی، افهمه جيداً وأجب عليه كتابةً."
+    systemInstruction: "أنت مساعد ذكي للرد على العملاء عبر الواتساب. أجب دائماً باللغة العربية بأسلوب ودود ومختصر يناسب محادثات الشات. إذا استمعت لمقطع صوتی, افهمه جيداً وأجب عليه كتابةً."
 });
 
 const client = new Client({
