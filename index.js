@@ -2,23 +2,24 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// 1. إعداد الذكاء الاصطناعي (Gemini API)
-const GEMINI_API_KEY = "ضع_مفتاح_API_الخاص_بـ_جوجل_هنا"; // استبدل هذا النص بمفتاحك الحقيقي
+// استدعاء المفتاح السري بأمان من إعدادات السيرفر (Environment Variables)
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
-    systemInstruction: "أنت مساعد ذكي للرد على العملاء عبر الواتساب. أجب دائماً باللغة العربية بأسلوب ودود ومختصر يناسب محادثات الشات. إذا استمعت لمقطع صوتي، افهمه جيداً وأجب عليه كتابةً."
+    systemInstruction: "أنت مساعد ذكي للرد على العملاء عبر الواتساب. أجب دائماً باللغة العربية بأسلوب ودود ومختصر يناسب محادثات الشات. إذا استمعت لمقطع صوتی، افهمه جيداً وأجب عليه كتابةً."
 });
 
-// 2. إعداد البوت
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+    puppeteer: { 
+        handleSIGINT: false,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    }
 });
 
-// توليد كود QR
 client.on('qr', (qr) => {
-    console.log('🤖 يرجى مسح كود الـ QR التالي باستخدام تطبيق واتساب:');
+    console.log('🤖 كود الـ QR جاهز للمسح:\n');
     qrcode.generate(qr, { small: true });
 });
 
@@ -26,20 +27,20 @@ client.on('ready', () => {
     console.log('✅ البوت جاهز الآن ومتصل بالواتساب ومستعد لاستقبال الرسائل والمكالمات!');
 });
 
-// معالجة المكالمات الواردة
+// إدارة المكالمات الواردة (الرفض التلقائي والرد برسالة)
 client.on('call', async (call) => {
     if (call.isGroup) return;
     console.log(`📞 مكالمة واردة من: ${call.from} - جاري الرفض والرد التلقائي...`);
     try {
         await call.reject();
-        const replyMessage = "🤖 *رد تلقائي:* أهلاً بك! عذراً، لا يمكنني استقبال المكالمات حالياً.\n\nيرجى إرسال استفسارك هنا في *رسالة نصية* أو *تسجيل صوتي* وسأجيبك فوراً! 🌹";
+        const replyMessage = "🤖 *رد تلقائي:* أهلاً بك! عذراً، لا يمكنني استقبال المكالمات الهاتفية حالياً.\n\nيرجى إرسال استفسارك هنا في *رسالة نصية* أو *تسجيل صوتي* وسأجيبك فوراً! 🌹";
         await client.sendMessage(call.from, replyMessage);
     } catch (err) {
         console.error("خطأ أثناء معالجة المكالمة:", err);
     }
 });
 
-// معالجة الرسائل والصوت الوارد
+// إدارة الرسائل والصوت الوارد عبر Gemini
 client.on('message', async (msg) => {
     if (msg.from.endsWith('@g.us') || msg.fromMe) return;
 
@@ -47,9 +48,9 @@ client.on('message', async (msg) => {
         let chat = await msg.getChat();
         await chat.sendStateTyping();
 
-        // إذا كانت الرسالة مقطعاً صوتياً
+        // التعامل مع المقاطع الصوتية
         if (msg.hasMedia && (msg.type === 'audio' || msg.type === 'ptt')) {
-            console.log(`🎙️ تم استقبال مقطع صوتي من: ${msg.from}`);
+            console.log(`🎙️ تسجيل صوتي من: ${msg.from}`);
             const media = await msg.downloadMedia();
             const mimeType = media.mimetype.split(';')[0];
 
@@ -60,9 +61,9 @@ client.on('message', async (msg) => {
 
             await msg.reply(result.response.text());
         } 
-        // إذا كانت الرسالة نصية
+        // التعامل مع الرسائل النصية
         else if (msg.type === 'chat') {
-            console.log(`💬 رسالة نصية واردة من: ${msg.from}`);
+            console.log(`💬 رسالة نصية من: ${msg.from}`);
             const result = await model.generateContent(msg.body);
             await msg.reply(result.response.text());
         }
